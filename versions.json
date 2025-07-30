@@ -16,6 +16,14 @@
             "urgent": false,
             "description": "Fixed interaction handling, improved embed updates, enhanced control panel"
         },
+        "InviteLogger": {
+            "version": "soon",
+            "releaseDate": "2025-07-30",
+            "downloadUrl": "https://plexdevelopment.net/products/invitelogger",
+            "breaking": false,
+            "urgent": false,
+            "description": "soon"
+        },
         "RewardSystem": {
             "version": "1.0.3",
             "releaseDate": "2025-06-19",
@@ -25,7 +33,7 @@
             "description": ""
         }
     },
-    "lastUpdated": "2025-06-19T19:43:00Z",
+    "lastUpdated": "2025-07-30T23:42:00Z",
     "repository": "https://github.com/Bali0531-RC/PlexAddons",
     "supportServer": "https://discord.gg/RFsfZmnaZV"
 }
