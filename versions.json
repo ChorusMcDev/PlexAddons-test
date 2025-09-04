@@ -25,8 +25,8 @@
             "description": "Added VersionChecker integration, complete translatable message system, separate log channels."
         },
         "RewardSystem": {
-            "version": "1.0.3",
-            "releaseDate": "2025-06-19",
+            "version": "1.0.0",
+            "releaseDate": "2025-09-04",
             "downloadUrl": "https://plexdevelopment.net/downloads/rewards",
             "breaking": false,
             "urgent": true,
