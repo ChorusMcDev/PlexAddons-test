@@ -26,11 +26,11 @@
         },
         "RewardSystem": {
             "version": "1.0.0",
-            "releaseDate": "2025-09-04",
+            "releaseDate": "2025-09-09",
             "downloadUrl": "https://plexdevelopment.net/downloads/rewards",
             "breaking": false,
             "urgent": true,
-            "description": ""
+            "description": "first release"
         }
     },
     "lastUpdated": "2025-07-31T15:39:00Z",
