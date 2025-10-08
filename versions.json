@@ -6,7 +6,10 @@
             "downloadUrl": "https://plexdevelopment.net/downloads/AIModeration",
             "breaking": false,
             "urgent": true,
-            "description": "Bug fixes for interaction handling and embed updates"
+            "description": "Bug fixes for interaction handling and embed updates",
+            "external": false,
+            "author": "bali0531",
+            "homepage": "https://plexdevelopment.net"
         },
         "TempVoice": {
             "version": "1.1.0",
@@ -14,7 +17,10 @@
             "downloadUrl": "https://plexdevelopment.net/downloads/tempvoice",
             "breaking": false,
             "urgent": false,
-            "description": "Fixed interaction handling, improved embed updates, enhanced control panel"
+            "description": "Fixed interaction handling, improved embed updates, enhanced control panel",
+            "external": false,
+            "author": "bali0531",
+            "homepage": "https://plexdevelopment.net"
         },
         "InviteLogger": {
             "version": "1.0.1",
@@ -22,7 +28,10 @@
             "downloadUrl": "https://plexdevelopment.net/products/invitelogger",
             "breaking": true,
             "urgent": false,
-            "description": "Added VersionChecker integration, complete translatable message system, separate log channels."
+            "description": "Added VersionChecker integration, complete translatable message system, separate log channels.",
+            "external": false,
+            "author": "bali0531",
+            "homepage": "https://plexdevelopment.net"
         },
         "RewardSystem": {
             "version": "1.0.0",
@@ -30,10 +39,14 @@
             "downloadUrl": "https://plexdevelopment.net/downloads/rewards",
             "breaking": false,
             "urgent": true,
-            "description": "first release"
+            "description": "first release",
+            "external": false,
+            "author": "bali0531",
+            "homepage": "https://plexdevelopment.net"
         }
     },
-    "lastUpdated": "2025-07-31T15:39:00Z",
+    "lastUpdated": "2025-10-08T00:00:00Z",
     "repository": "https://github.com/Bali0531-RC/PlexAddons",
-    "supportServer": "https://discord.gg/RFsfZmnaZV"
+    "supportContact": "https://discord.com/users/1141211789552537691",
+    "description": "Unofficial PlexAddons version registry by bali0531. Includes paid addons sold on PlexStore (external: false) and free community addons (external: true). All addons are community-made."
 }

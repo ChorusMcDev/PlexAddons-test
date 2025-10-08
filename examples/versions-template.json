@@ -1,0 +1,31 @@
+{
+    "addons": {
+        "YourPlexAddon": {
+            "version": "1.0.0",
+            "releaseDate": "2025-10-08",
+            "downloadUrl": "https://github.com/yourusername/plex-addon/releases",
+            "breaking": false,
+            "urgent": false,
+            "description": "Initial release - describe your changes here",
+            "external": true,
+            "author": "Your Discord Username",
+            "homepage": "https://github.com/yourusername/plex-addon",
+            "changelog": "https://github.com/yourusername/plex-addon/blob/main/CHANGELOG.md"
+        },
+        "AnotherPlexAddon": {
+            "version": "2.5.0",
+            "releaseDate": "2025-10-08",
+            "downloadUrl": "https://github.com/example/plex-addon/releases",
+            "breaking": true,
+            "urgent": false,
+            "description": "Major update with breaking changes",
+            "external": true,
+            "author": "Developer Name",
+            "homepage": "https://github.com/example/plex-addon"
+        }
+    },
+    "lastUpdated": "2025-10-08T12:00:00Z",
+    "repository": "https://github.com/Bali0531-RC/PlexAddons",
+    "supportServer": "https://discord.gg/RFsfZmnaZV",
+    "description": "Template for Plex Development Discord bot addon registry"
+}

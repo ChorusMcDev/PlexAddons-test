@@ -108,8 +108,12 @@ class VersionChecker {
                 description: latestInfo.description,
                 urgent: latestInfo.urgent || false,
                 breaking: latestInfo.breaking || false,
+                external: latestInfo.external || false,
+                author: latestInfo.author || null,
+                homepage: latestInfo.homepage || null,
+                changelog: latestInfo.changelog || null,
                 repository: versionData.repository,
-                supportServer: versionData.supportServer,
+                supportContact: versionData.supportContact || versionData.supportServer,
                 lastUpdated: versionData.lastUpdated
             };
         } catch (error) {
@@ -152,9 +156,14 @@ class VersionChecker {
     getUpdateDetails(checkResult) {
         if (!checkResult.success || !checkResult.isOutdated) return '';
         
-        let details = `\n\x1b[1m📦 PlexAddons Update Available for ${this.addonName}\x1b[0m\n`;
+        const source = checkResult.external ? 'Free Addon Update' : 'Paid Addon Update';
+        let details = `\n\x1b[1m📦 ${source} Available for ${this.addonName}\x1b[0m\n`;
         details += `   Current: v${checkResult.current}\n`;
         details += `   Latest:  v${checkResult.latest} (${checkResult.releaseDate})\n`;
+        
+        if (checkResult.author) {
+            details += `   Author:  ${checkResult.author}\n`;
+        }
         
         if (checkResult.description) {
             details += `   Changes: ${checkResult.description}\n`;
@@ -169,8 +178,22 @@ class VersionChecker {
         }
         
         details += `   Download: ${checkResult.downloadUrl}\n`;
-        details += `   Repository: ${checkResult.repository}\n`;
-        details += `   Support: ${checkResult.supportServer}\n`;
+        
+        if (checkResult.changelog) {
+            details += `   Changelog: ${checkResult.changelog}\n`;
+        }
+        
+        if (checkResult.homepage) {
+            details += `   Homepage: ${checkResult.homepage}\n`;
+        }
+        
+        if (checkResult.repository) {
+            details += `   Repository: ${checkResult.repository}\n`;
+        }
+        
+        if (checkResult.supportContact) {
+            details += `   Support: ${checkResult.supportContact}\n`;
+        }
         
         return details;
     }

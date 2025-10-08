@@ -1,0 +1,43 @@
+{
+    "addons": {
+        "MyPlexAddon": {
+            "version": "2.5.0",
+            "releaseDate": "2025-09-15",
+            "downloadUrl": "https://github.com/yourusername/plex-addon/releases/latest",
+            "breaking": false,
+            "urgent": false,
+            "description": "Added new slash commands, improved performance, fixed memory leaks",
+            "external": true,
+            "author": "YourDiscordUsername",
+            "homepage": "https://github.com/yourusername/plex-addon",
+            "changelog": "https://github.com/yourusername/plex-addon/blob/main/CHANGELOG.md"
+        },
+        "AnotherPlexAddon": {
+            "version": "1.0.5",
+            "releaseDate": "2025-10-01",
+            "downloadUrl": "https://github.com/someone/addon/releases",
+            "breaking": false,
+            "urgent": true,
+            "description": "Critical security patch - please update immediately",
+            "external": true,
+            "author": "Developer Name",
+            "homepage": "https://github.com/someone/addon"
+        },
+        "CommunityPlexAddon": {
+            "version": "3.1.0",
+            "releaseDate": "2025-10-05",
+            "downloadUrl": "https://github.com/community/plex-addon/releases",
+            "breaking": true,
+            "urgent": false,
+            "description": "Major refactor: Changed API structure, updated to Discord.js v14, new configuration format required",
+            "external": true,
+            "author": "Community Developer",
+            "homepage": "https://github.com/community/plex-addon",
+            "changelog": "https://github.com/community/plex-addon/blob/main/CHANGELOG.md"
+        }
+    },
+    "lastUpdated": "2025-10-05T14:30:00Z",
+    "repository": "https://github.com/yourusername/your-plex-addons-registry",
+    "supportServer": "https://discord.gg/RFsfZmnaZV",
+    "description": "Example self-hosted registry for Plex Development Discord bot addons"
+}
