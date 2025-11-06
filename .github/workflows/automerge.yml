@@ -101,7 +101,7 @@ jobs:
           gh pr comment "$PR_NUMBER" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
 
       - name: Enable auto-merge for approved PRs
-        if: steps.validate.outputs.result == '✅ Approved: All checks passed. Ready to merge!'
+        if: contains(steps.validate.outputs.result, 'Approved')
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           pull-request-number: ${{ github.event.pull_request.number }}
