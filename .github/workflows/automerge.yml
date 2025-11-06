@@ -22,7 +22,7 @@ jobs:
           curl -s -o base.json https://raw.githubusercontent.com/${{ github.repository }}/${{ github.base_ref }}/versions.json
           curl -s -o pr.json https://raw.githubusercontent.com/${{ github.event.pull_request.head.repo.full_name }}/${{ github.event.pull_request.head.ref }}/versions.json
 
-      - name: 🔎 Validate versions.json changes
+            - name: 🔎 Validate versions.json changes
         id: validate
         run: |
           echo "🔍 Comparing base.json vs pr.json..."
@@ -66,9 +66,10 @@ jobs:
             exit 0
           fi
 
-          # Allow small edits only to version/description
-          if echo "$added$removed" | grep -Eq '"version"|"description"' && ! echo "$added$removed" | grep -Eq '"external":|addons";'; then
-            echo "result=⏳ Pending: Manual review required for version/description edits." >> $GITHUB_OUTPUT
+          # Allow small edits only to version/description/releaseDate
+          if echo "$added$removed" | grep -Eq '"(version|description|releaseDate)"' && \
+             ! echo "$added$removed" | grep -Eq '"external":|addons";|downloadUrl|homepage|author|breaking|urgent'; then
+            echo "result=⏳ Pending: Manual review required for version/description/releaseDate edits." >> $GITHUB_OUTPUT
             exit 0
           fi
 
