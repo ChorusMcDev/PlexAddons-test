@@ -1,0 +1,94 @@
+name: Auto Merge Safe PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-and-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up jq
+        run: sudo apt-get install -y jq
+
+      - name: Validate PR changes
+        id: validate
+        run: |
+          comment() {
+            gh pr comment ${{ github.event.pull_request.number }} --body "$1"
+          }
+
+          echo "🧩 Validating PR changes..."
+
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          if [ "$changed" != "versions.json" ]; then
+            comment "❌ **Validation failed:** Only \`versions.json\` can be modified. Changed files: \`$changed\`"
+            exit 1
+          fi
+
+          removed=$(git diff origin/${{ github.base_ref }}...HEAD -- versions.json | grep '^-' | grep -v '^---' || true)
+          if [ -n "$removed" ]; then
+            comment "❌ **Validation failed:** Modifications or deletions detected. Only new addon entries are allowed."
+            exit 1
+          fi
+
+          if ! jq empty versions.json >/dev/null 2>&1; then
+            comment "❌ **Validation failed:** Invalid JSON syntax in \`versions.json\`."
+            exit 1
+          fi
+
+          base_json=$(git show origin/${{ github.base_ref }}:versions.json)
+          new_json=$(cat versions.json)
+
+          added_keys=$(jq -r '
+            (.addons | keys) - ($base.addons | keys)
+          ' --argjson base "$base_json" "$new_json")
+
+          if [ -z "$added_keys" ] || [ "$added_keys" = "null" ]; then
+            comment "❌ **Validation failed:** No new addon detected or an existing addon was modified. Only *new* external addons may be added."
+            exit 1
+          fi
+
+          failed=""
+          for key in $added_keys; do
+            echo "🔍 Checking $key..."
+            obj=$(echo "$new_json" | jq -r --arg key "$key" '.addons[$key]')
+            
+            required_fields=(version releaseDate downloadUrl breaking urgent description external author homepage)
+            for field in "${required_fields[@]}"; do
+              value=$(echo "$obj" | jq -r ".${field}")
+              if [ "$value" = "null" ] || [ "$value" = "" ]; then
+                failed+="\n❌ **$key:** Missing required field \`$field\`."
+              fi
+            done
+
+            external=$(echo "$obj" | jq -r '.external')
+            if [ "$external" != "true" ]; then
+              failed+="\n❌ **$key:** Field \`external\` must be **true**."
+            fi
+          done
+
+          if [ -n "$failed" ]; then
+            comment "🚫 **Validation failed for one or more addons:**\n$failed"
+            exit 1
+          fi
+
+          comment "✅ **Validation passed!** All new addons are complete and marked as external."
+          echo "ok=true" >> $GITHUB_OUTPUT
+
+      - name: Auto-merge PR
+        if: steps.validate.outputs.ok == 'true'
+        uses: peter-evans/merge-pull-request@v3
+        with:
+          merge-method: squash
+          commit-message: "Auto-merged verified external addon PR #${{ github.event.pull_request.number }}"
+          delete-branch: true
