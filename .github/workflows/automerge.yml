@@ -1,4 +1,5 @@
 name: Auto Validator
+
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -10,99 +11,90 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.validate.outputs.result }}
 
     steps:
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
-      - name: Fetch versions.json from base and PR
+      - name: 🔍 Fetch base and PR versions.json
+        id: fetch
         run: |
-          echo "📥 Fetching versions.json from base and PR..."
+          echo "Fetching base and PR versions.json..."
+          curl -s -o base.json https://raw.githubusercontent.com/${{ github.repository }}/${{ github.base_ref }}/versions.json
+          curl -s -o pr.json https://raw.githubusercontent.com/${{ github.event.pull_request.head.repo.full_name }}/${{ github.event.pull_request.head.ref }}/versions.json
 
-          curl -s -o base.json \
-            https://raw.githubusercontent.com/${{ github.repository }}/${{ github.base_ref }}/versions.json
-
-          curl -s -o pr.json \
-            https://raw.githubusercontent.com/${{ github.event.pull_request.head.repo.full_name }}/${{ github.event.pull_request.head.ref }}/versions.json
-
-          echo "✅ Files fetched:"
-          ls -lh base.json pr.json
-
-      - name: Validate PR changes
+      - name: 🔎 Validate versions.json changes
         id: validate
         run: |
           echo "🔍 Comparing base.json vs pr.json..."
-
           diff_output=$(diff -u base.json pr.json || true)
-          echo "$diff_output" > diff.log
 
-          added_lines=$(echo "$diff_output" | grep '^+' | grep -v '^+++' || true)
-          removed_lines=$(echo "$diff_output" | grep '^-' | grep -v '^---' || true)
+          added=$(echo "$diff_output" | grep '^+' | grep -v '+++' || true)
+          removed=$(echo "$diff_output" | grep '^-' | grep -v '---' || true)
 
           echo "Added lines:"
-          echo "$added_lines"
+          echo "$added"
           echo "Removed lines:"
-          echo "$removed_lines"
+          echo "$removed"
 
-          if [ -z "$added_lines" ] && [ -z "$removed_lines" ]; then
-            echo "⚠️ Warning: No file changes detected."
+          # Syntax validation
+          echo "✅ Syntax check for versions.json..."
+          if ! jq empty pr.json; then
+            echo "result=❌ Denied: Invalid JSON syntax." >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Only one file changed rule
+          changed_files=$(echo "$added$removed" | wc -l)
+          if [[ $changed_files -eq 0 ]]; then
             echo "result=⚠️ Warning: No file changes detected." >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          echo "✅ Syntax check for versions.json..."
-          jq empty pr.json || { 
-            echo "❌ Denied: Invalid JSON syntax in versions.json."
-            echo "result=❌ Denied: Invalid JSON syntax in versions.json." >> $GITHUB_OUTPUT
-            exit 1
-          }
-
-          if [ -n "$removed_lines" ] && [ -z "$added_lines" ]; then
-            echo "❌ Denied: Removing entries is not allowed."
-            echo "result=❌ Denied: Removing entries is not allowed." >> $GITHUB_OUTPUT
-            exit 1
+          # Check if PR modifies non-external addons
+          if echo "$added$removed" | grep -q '"external": false'; then
+            echo "result=❌ Denied: Modifying internal addons is not allowed." >> $GITHUB_OUTPUT
+            exit 0
           fi
 
-          if [ -n "$added_lines" ] && [ -n "$removed_lines" ]; then
-            # Check if only version/description changed
-            if echo "$added_lines" | grep -Eq '"(version|description)":' && echo "$removed_lines" | grep -Eq '"(version|description)":'; then
-              echo "🕓 Pending: Only version/description modified — manual review required."
-              echo "result=🕓 Pending: Only version/description modified — manual review required." >> $GITHUB_OUTPUT
-              exit 0
-            fi
+          # Detect edits vs additions
+          added_addons=$(echo "$added" | grep '"addons"' | wc -l)
+          removed_addons=$(echo "$removed" | grep '"addons"' | wc -l)
 
-            echo "❌ Denied: Modifying existing addons is not allowed."
-            echo "result=❌ Denied: Modifying existing addons is not allowed." >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-          # If only added lines exist (new addons)
-          if [ -n "$added_lines" ] && [ -z "$removed_lines" ]; then
-            if echo "$added_lines" | grep -q '"external": false'; then
-              echo "❌ Denied: Only addons with \"external\": true can be added automatically."
-              echo "result=❌ Denied: Only addons with \"external\": true can be added automatically." >> $GITHUB_OUTPUT
-              exit 1
-            fi
-
-            echo "✅ Approved: All checks passed. Ready to merge!"
+          # If new addon added and it's external -> allow
+          if echo "$added" | grep -q '"external": true' && [[ $removed_addons -eq 0 ]]; then
             echo "result=✅ Approved: All checks passed. Ready to merge!" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          echo "🕓 Pending: Could not determine change type — requires manual review."
-          echo "result=🕓 Pending: Could not determine change type — requires manual review." >> $GITHUB_OUTPUT
+          # Allow small edits only to version/description
+          if echo "$added$removed" | grep -Eq '"version"|"description"' && ! echo "$added$removed" | grep -Eq '"external":|addons";'; then
+            echo "result=⏳ Pending: Manual review required for version/description edits." >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If any other change occurs -> deny
+          echo "result=❌ Denied: Modifying existing addons is not allowed." >> $GITHUB_OUTPUT
           exit 0
 
-      - name: Comment on PR
+      - name: Checkout for gh CLI
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 1
+
+      - name: 💬 Comment validation results on PR
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           echo "💬 Commenting validation results on PR #${PR_NUMBER}"
+          gh pr comment "$PR_NUMBER" --delete-last || true
           gh pr comment "$PR_NUMBER" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
 
-      - name: Enable auto-merge for approved PRs
+      - name: ✅ Enable auto-merge for approved PRs
         if: contains(steps.validate.outputs.result, 'Approved')
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
