@@ -1,107 +1,107 @@
-name: Auto Merge Safe PRs
-
+name: Auto Validator
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
-  pull-requests: write
   contents: write
+  pull-requests: write
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout base branch
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - run: sudo apt-get install -y jq gh
-
-      - id: validation
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Fetch PR branch
         run: |
-          pr_number=${{ github.event.pull_request.number }}
+          echo "🔍 Fetching base and PR branches..."
+          git fetch origin ${{ github.base_ref }} --depth=1
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
+          echo "✅ Fetched PR head as pr-${{ github.event.pull_request.number }}"
 
-          # Function to post or update PR comment
-          post_comment() {
-            local msg="$1"
-            echo "$msg" > body.txt
-            gh pr comment "$pr_number" --edit-last --create-if-none -F body.txt || \
-            gh pr comment "$pr_number" -F body.txt
-          }
-
-          msg="### 🤖 Auto Validator Results [auto-validator]"
-
-          # Ensure both base and head refs exist
-          git fetch origin ${{ github.base_ref }} ${{ github.head_ref }} --depth=1
-
-          # Determine changed files
-          changed=$(git diff --name-only origin/${{ github.base_ref }}...origin/${{ github.head_ref }} | xargs)
+      - name: Validate PR changes
+        id: validate
+        run: |
+          echo "🔍 Comparing origin/${{ github.base_ref }}...pr-${{ github.event.pull_request.number }}"
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...pr-${{ github.event.pull_request.number }} | xargs)
+          echo "Changed files: $changed"
 
           if [ -z "$changed" ]; then
-            post_comment "$msg\n\n⚠️ **Warning:** No file changes detected. Please make sure you actually modified \`versions.json\`."
-            exit 1
+            echo "⚠️ Warning: No file changes detected."
+            echo "result=⚠️ Warning: No file changes detected." >> $GITHUB_OUTPUT
+            exit 0
           fi
 
           if [ "$changed" != "versions.json" ]; then
-            formatted_files=$(echo "$changed" | sed 's/^/- /')
-            post_comment "$msg\n\n❌ **Denied:** Only \`versions.json\` may be modified.\n\n**Changed files:**\n$formatted_files"
+            echo "❌ Denied: Only versions.json may be modified. (Changed files: $changed)"
+            echo "result=❌ Denied: Only versions.json may be modified. (Changed files: $changed)" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Validate JSON syntax
-          if ! jq empty versions.json >/dev/null 2>&1; then
-            post_comment "$msg\n\n❌ **Denied:** Invalid JSON syntax in \`versions.json\`.\n\n🛠️ Please check your file with a JSON validator."
+          echo "✅ Syntax check for versions.json..."
+          jq empty versions.json || { echo "❌ Denied: Invalid JSON syntax in versions.json."; echo "result=❌ Denied: Invalid JSON syntax in versions.json." >> $GITHUB_OUTPUT; exit 1; }
+
+          echo "🔍 Checking diff for types of changes..."
+          added_lines=$(git diff origin/${{ github.base_ref }}...pr-${{ github.event.pull_request.number }} -- versions.json | grep '^+' | grep -v '^+++' || true)
+          removed_lines=$(git diff origin/${{ github.base_ref }}...pr-${{ github.event.pull_request.number }} -- versions.json | grep '^-' | grep -v '^---' || true)
+
+          if [ -n "$removed_lines" ] && [ -z "$added_lines" ]; then
+            echo "❌ Denied: Removing entries is not allowed."
+            echo "result=❌ Denied: Removing entries is not allowed." >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Get JSON before and after
-          base_json=$(git show origin/${{ github.base_ref }}:versions.json)
-          new_json=$(cat versions.json)
-
-          # Find new addon keys
-          added_keys=$(jq -r '
-            (.addons | keys) - ($base.addons | keys)
-          ' --argjson base "$base_json" "$new_json")
-
-          if [ -z "$added_keys" ] || [ "$added_keys" = "null" ]; then
-            post_comment "$msg\n\n❌ **Denied:** No new addon detected, or an existing one was modified.\n\n🧩 Only **new external addons** can be automatically accepted."
+          if [ -z "$added_lines" ] && [ -n "$removed_lines" ]; then
+            echo "❌ Denied: You cannot remove data from versions.json."
+            echo "result=❌ Denied: You cannot remove data from versions.json." >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Check each added addon
-          failed=""
-          for key in $added_keys; do
-            obj=$(echo "$new_json" | jq -r --arg key "$key" '.addons[$key]')
-            required=(version releaseDate downloadUrl breaking urgent description external author homepage)
-            for f in "${required[@]}"; do
-              v=$(echo "$obj" | jq -r ".${f}")
-              if [ "$v" = "null" ] || [ "$v" = "" ]; then
-                failed+="\n- **$key:** Missing required field \`$f\`."
-              fi
-            done
-            ext=$(echo "$obj" | jq -r ".external")
-            if [ "$ext" != "true" ]; then
-              failed+="\n- **$key:** The \`external\` field must be set to **true**."
+          if [ -n "$added_lines" ] && [ -n "$removed_lines" ]; then
+            # Check if only version or description fields changed
+            if echo "$added_lines" | grep -Eq '"(version|description)":' && echo "$removed_lines" | grep -Eq '"(version|description)":'; then
+              echo "🕓 Pending: Only version/description modified — manual review required."
+              echo "result=🕓 Pending: Only version/description modified — manual review required." >> $GITHUB_OUTPUT
+              exit 0
             fi
-          done
 
-          if [ -n "$failed" ]; then
-            post_comment "$msg\n\n🚫 **Validation failed:**\n$failed\n\n🛠️ Please fix the issues above and push again."
+            echo "❌ Denied: Modifying existing addons is not allowed."
+            echo "result=❌ Denied: Modifying existing addons is not allowed." >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          post_comment "$msg\n\n✅ **Approved!**\n\nAll checks passed — the new addon(s) meet all validation rules.\nThis PR will be automatically merged soon. 🎉"
-          echo "ok=true" >> $GITHUB_OUTPUT
+          # If only new lines were added (new addons)
+          if [ -n "$added_lines" ] && [ -z "$removed_lines" ]; then
+            if echo "$added_lines" | grep -q '"external": false'; then
+              echo "❌ Denied: Only addons with \"external\": true can be added automatically."
+              echo "result=❌ Denied: Only addons with \"external\": true can be added automatically." >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            echo "✅ Approved: All checks passed. Ready to merge!"
+            echo "result=✅ Approved: All checks passed. Ready to merge!" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-  enable-automerge:
-    runs-on: ubuntu-latest
-    needs: validate
-    if: ${{ success() }}
-    steps:
-      - name: Enable auto-merge
+          echo "🕓 Pending: Could not determine change type — requires manual review."
+          echo "result=🕓 Pending: Could not determine change type — requires manual review." >> $GITHUB_OUTPUT
+          exit 0
+
+      - name: Comment on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "💬 Commenting validation results on PR #${PR_NUMBER}"
+          gh pr comment "$PR_NUMBER" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
+
+      - name: Enable auto-merge for approved PRs
+        if: steps.validate.outputs.result == '✅ Approved: All checks passed. Ready to merge!'
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           pull-request-number: ${{ github.event.pull_request.number }}
