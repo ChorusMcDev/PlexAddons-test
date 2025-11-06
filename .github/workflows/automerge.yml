@@ -24,6 +24,7 @@ jobs:
         run: |
           pr_number=${{ github.event.pull_request.number }}
 
+          # Function to post or update PR comment
           post_comment() {
             local msg="$1"
             echo "$msg" > body.txt
@@ -31,37 +32,46 @@ jobs:
             gh pr comment "$pr_number" -F body.txt
           }
 
-          msg="### 🤖 Auto Validator Results [auto-validator]\n"
+          msg="### 🤖 Auto Validator Results [auto-validator]"
 
-          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          # Ensure both base and head refs exist
+          git fetch origin ${{ github.base_ref }} ${{ github.head_ref }} --depth=1
+
+          # Determine changed files
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...origin/${{ github.head_ref }} | xargs)
+
+          if [ -z "$changed" ]; then
+            post_comment "$msg\n\n⚠️ **Warning:** No file changes detected. Please make sure you actually modified \`versions.json\`."
+            exit 1
+          fi
+
           if [ "$changed" != "versions.json" ]; then
-            post_comment "$msg❌ **Denied:** Only \`versions.json\` may be modified. (Changed files: \`$changed\`)"
+            formatted_files=$(echo "$changed" | sed 's/^/- /')
+            post_comment "$msg\n\n❌ **Denied:** Only \`versions.json\` may be modified.\n\n**Changed files:**\n$formatted_files"
             exit 1
           fi
 
-          removed=$(git diff origin/${{ github.base_ref }}...HEAD -- versions.json | grep '^-' | grep -v '^---' || true)
-          if [ -n "$removed" ]; then
-            post_comment "$msg❌ **Denied:** You cannot remove or modify existing lines, only add new entries."
-            exit 1
-          fi
-
+          # Validate JSON syntax
           if ! jq empty versions.json >/dev/null 2>&1; then
-            post_comment "$msg❌ **Denied:** Invalid JSON syntax in \`versions.json\`."
+            post_comment "$msg\n\n❌ **Denied:** Invalid JSON syntax in \`versions.json\`.\n\n🛠️ Please check your file with a JSON validator."
             exit 1
           fi
 
+          # Get JSON before and after
           base_json=$(git show origin/${{ github.base_ref }}:versions.json)
           new_json=$(cat versions.json)
 
+          # Find new addon keys
           added_keys=$(jq -r '
             (.addons | keys) - ($base.addons | keys)
           ' --argjson base "$base_json" "$new_json")
 
           if [ -z "$added_keys" ] || [ "$added_keys" = "null" ]; then
-            post_comment "$msg❌ **Denied:** No new addon detected, or an existing one was modified. Only new *external* addons are allowed."
+            post_comment "$msg\n\n❌ **Denied:** No new addon detected, or an existing one was modified.\n\n🧩 Only **new external addons** can be automatically accepted."
             exit 1
           fi
 
+          # Check each added addon
           failed=""
           for key in $added_keys; do
             obj=$(echo "$new_json" | jq -r --arg key "$key" '.addons[$key]')
@@ -69,21 +79,21 @@ jobs:
             for f in "${required[@]}"; do
               v=$(echo "$obj" | jq -r ".${f}")
               if [ "$v" = "null" ] || [ "$v" = "" ]; then
-                failed+="\n❌ **$key:** Missing required field \`$f\`."
+                failed+="\n- **$key:** Missing required field \`$f\`."
               fi
             done
             ext=$(echo "$obj" | jq -r ".external")
             if [ "$ext" != "true" ]; then
-              failed+="\n❌ **$key:** The \`external\` field must be set to **true**."
+              failed+="\n- **$key:** The \`external\` field must be set to **true**."
             fi
           done
 
           if [ -n "$failed" ]; then
-            post_comment "$msg🚫 **Validation failed:**$failed"
+            post_comment "$msg\n\n🚫 **Validation failed:**\n$failed\n\n🛠️ Please fix the issues above and push again."
             exit 1
           fi
 
-          post_comment "$msg✅ **Approved!** All checks passed — this PR will be auto-merged."
+          post_comment "$msg\n\n✅ **Approved!**\n\nAll checks passed — the new addon(s) meet all validation rules.\nThis PR will be automatically merged soon. 🎉"
           echo "ok=true" >> $GITHUB_OUTPUT
 
   enable-automerge:
