@@ -36,16 +36,14 @@ jobs:
           echo "Removed lines:"
           echo "$removed"
 
-          # ✅ Syntax validation
-          echo "✅ Syntax check for versions.json..."
+          # ✅ Check JSON syntax
           if ! jq empty pr.json; then
             echo "result=❌ Denied: Invalid JSON syntax." >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # ⚠️ Check if any file changed at all
-          changed_files=$(echo "$added$removed" | wc -l)
-          if [[ $changed_files -eq 0 ]]; then
+          # ⚠️ No file changes detected
+          if [[ -z "$added$removed" ]]; then
             echo "result=⚠️ Warning: No file changes detected." >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -56,24 +54,25 @@ jobs:
             exit 0
           fi
 
-          # 🆕 New external addon added
-          added_addons=$(echo "$added" | grep '"addons"' | wc -l)
-          removed_addons=$(echo "$removed" | grep '"addons"' | wc -l)
-          if echo "$added" | grep -q '"external": true' && [[ $removed_addons -eq 0 ]]; then
+          # 🆕 Added new external addon
+          if echo "$added" | grep -q '"external": true' && ! echo "$removed" | grep -q '"addons"'; then
             echo "result=✅ Approved: All checks passed. Ready to merge!" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # 🕵️ Allow small edits only to version/description/releaseDate
-          if echo "$added$removed" | grep -Eq '"(version|description|releaseDate)"' && \
-             ! echo "$added$removed" | grep -Eq '"external":|addons";|downloadUrl|homepage|author|breaking|urgent'; then
-            echo "result=⏳ Pending: Manual review required for version/description/releaseDate edits." >> $GITHUB_OUTPUT
+          # ⏳ Allowed fields for manual review
+          allowed_fields_regex='"(version|description|releaseDate|lastUpdated|changelog|urgent|breaking)"'
+
+          if echo "$added$removed" | grep -Eq "$allowed_fields_regex" && \
+             ! echo "$added$removed" | grep -Eq '"(author|homepage|repository|supportServer|downloadUrl|external)"'; then
+            echo "result=⏳ Pending: Manual review required (allowed fields modified)." >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # ❌ Everything else = denied
+          # ❌ Everything else denied
           echo "result=❌ Denied: Modifying existing addons is not allowed." >> $GITHUB_OUTPUT
           exit 0
+
 
 
       - name: Checkout for gh CLI
