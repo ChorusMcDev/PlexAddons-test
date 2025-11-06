@@ -26,12 +26,9 @@ jobs:
 
           post_comment() {
             local msg="$1"
-            existing_id=$(gh pr comment list $pr_number --json id,body | jq -r '.[] | select(.body | contains("[auto-validator]")) | .id' || true)
-            if [ -n "$existing_id" ]; then
-              gh pr comment edit "$existing_id" --body "$msg"
-            else
-              gh pr comment $pr_number --body "$msg"
-            fi
+            echo "$msg" > body.txt
+            gh pr comment "$pr_number" --edit-last --create-if-none -F body.txt || \
+            gh pr comment "$pr_number" -F body.txt
           }
 
           msg="### 🤖 Auto Validator Results [auto-validator]\n"
