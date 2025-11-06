@@ -28,8 +28,8 @@ jobs:
           echo "🔍 Comparing base.json vs pr.json..."
           diff_output=$(diff -u base.json pr.json || true)
 
-          added=$(echo "$diff_output" | grep '^+' | grep -v '+++' || true)
-          removed=$(echo "$diff_output" | grep '^-' | grep -v '---' || true)
+          added=$(echo "$diff_output" | grep '^+' | grep -v -- '+++' || true)
+          removed=$(echo "$diff_output" | grep '^-' | grep -v -- '---' || true)
 
           echo "Added lines:"
           echo "$added"
@@ -91,8 +91,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           echo "💬 Commenting validation results on PR #${PR_NUMBER}"
-          gh pr comment "$PR_NUMBER" --delete-last || true
-          gh pr comment "$PR_NUMBER" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
+          gh pr comment "$PR_NUMBER" -R "${{ github.repository }}" --delete-last --yes || true
+          gh pr comment "$PR_NUMBER" -R "${{ github.repository }}" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
 
       - name: ✅ Enable auto-merge for approved PRs
         if: contains(steps.validate.outputs.result, 'Approved')
