@@ -92,7 +92,7 @@ jobs:
         run: |
           echo "💬 Commenting validation results on PR #${PR_NUMBER}"
           gh pr comment "$PR_NUMBER" -R "${{ github.repository }}" --delete-last --yes || true
-          gh pr comment "$PR_NUMBER" -R "${{ github.repository }}" --body "🤖 Auto Validator Results [auto-validator]\n\n${{ steps.validate.outputs.result }}"
+          gh pr comment "$PR_NUMBER" -R "${{ github.repository }}" --body $'🤖 **Auto Validator Results [auto-validator]**\n\n${{ steps.validate.outputs.result }}'
 
       - name: ✅ Enable auto-merge for approved PRs
         if: contains(steps.validate.outputs.result, 'Approved')
